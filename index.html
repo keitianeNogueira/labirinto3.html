@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Labirinto do Orçamento</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --fundo:#E7F0E4;
+    --tinta:#22303C;
+    --suave:#56655f;
+    --cerca:#3F7D4E;
+    --cerca-escura:#28543A;
+    --chao:#F3E6C8;
+    --ouro:#F2C14E;
+    --porta:#C9533E;
+    --tentacao:#8E5BC7;
+    --verde:#2E8B57;
+    --display:"Fredoka","Trebuchet MS",sans-serif;
+    --texto:"Nunito",Verdana,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--fundo);color:var(--tinta);font-family:var(--texto);font-size:1.05rem;line-height:1.5}
+  button{font:inherit;cursor:pointer}
+  :focus-visible{outline:3px solid var(--porta);outline-offset:3px}
+  .wrap{max-width:900px;margin:0 auto;padding:24px 16px 48px}
+
+  header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+  h1{font-family:var(--display);font-weight:700;font-size:clamp(2.2rem,6vw,3.4rem);line-height:1;margin:0}
+  header p{margin:6px 0 0;color:var(--suave);max-width:48ch}
+
+  .btn{border:3px solid var(--tinta);background:var(--tinta);color:#fff;border-radius:14px;padding:10px 20px;font-weight:800;box-shadow:0 4px 0 #0e161d}
+  .btn:active{transform:translateY(3px);box-shadow:0 1px 0 #0e161d}
+  .btn.claro{background:#fff;color:var(--tinta);box-shadow:0 4px 0 var(--tinta)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+
+  /* Painel */
+  .hud{display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:10px;margin-bottom:14px}
+  .caixa{background:#fff;border-radius:14px;padding:10px 14px;border:3px solid var(--tinta)}
+  .caixa .n{font-family:var(--display);font-weight:700;font-size:1.6rem;line-height:1.1}
+  .caixa .l{font-size:.88rem;color:var(--suave)}
+  .progresso{height:12px;border-radius:6px;background:#eadfc5;margin-top:6px;overflow:hidden;position:relative}
+  .progresso div{height:100%;background:var(--ouro);transition:width .4s ease}
+  .progresso.ok div{background:var(--verde)}
+
+  /* Labirinto */
+  .labirinto{max-width:max(320px, calc((100vh - 300px) * 1.46));margin:0 auto;position:relative;container-type:inline-size;display:grid;border:6px solid var(--cerca-escura);border-radius:16px;overflow:hidden;background:var(--chao);touch-action:none}
+  .c{aspect-ratio:1;display:grid;place-items:center;font-size:calc(100cqw / var(--w) * .68);line-height:1;position:relative}
+  .c.parede{background:var(--cerca);box-shadow:inset 0 -3px 0 var(--cerca-escura), inset 2px 2px 0 rgba(255,255,255,.12);border-radius:3px}
+  .c.porta{background:var(--porta);border-radius:4px;color:#fff;font-family:var(--display);font-weight:700;font-size:calc(100cqw / var(--w) * .55)}
+  .c.tentacao::before{content:"";position:absolute;inset:12%;border-radius:50%;background:rgba(142,91,199,.2)}
+  .c.saida{background:#d7f0dc}
+  .jogador{position:absolute;top:0;left:0;display:grid;place-items:center;font-size:calc(100cqw / var(--w) * .78);transition:transform .14s ease;z-index:2;pointer-events:none}
+  .jogador.bateu{animation:treme .2s}
+  @keyframes treme{25%{margin-left:-3px}75%{margin-left:3px}}
+  .brilho{position:absolute;z-index:3;font-family:var(--display);font-weight:700;color:var(--verde);font-size:1rem;pointer-events:none;animation:sobe .9s ease-out forwards;white-space:nowrap}
+  .brilho.menos{color:var(--porta)}
+  @keyframes sobe{to{transform:translateY(-36px);opacity:0}}
+
+  /* Controles */
+  .baixo{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:16px;flex-wrap:wrap}
+  .legenda{display:flex;gap:14px;flex-wrap:wrap;font-size:.95rem;color:var(--suave)}
+  .legenda span{display:flex;align-items:center;gap:6px}
+  .legenda b{font-size:1.2rem}
+  .dpad{display:grid;grid-template-columns:repeat(3,56px);grid-template-rows:repeat(3,56px);gap:4px}
+  .dpad button{border:3px solid var(--tinta);background:#fff;border-radius:12px;font-size:1.4rem;font-weight:800;color:var(--tinta);box-shadow:0 3px 0 var(--tinta)}
+  .dpad button:active{transform:translateY(2px);box-shadow:0 1px 0 var(--tinta)}
+  .dpad .cima{grid-column:2}
+  .dpad .esq{grid-column:1;grid-row:2}
+  .dpad .dir{grid-column:3;grid-row:2}
+  .dpad .baixo-b{grid-column:2;grid-row:3}
+
+  /* Janela */
+  .fundo-modal{position:fixed;inset:0;background:rgba(20,32,26,.55);display:none;place-items:center;padding:16px;z-index:10}
+  .fundo-modal.aberto{display:grid}
+  .modal{background:#fff;border-radius:22px;border:4px solid var(--tinta);max-width:520px;width:100%;padding:26px;max-height:92vh;overflow:auto}
+  .modal .selo{font-size:2.6rem;line-height:1}
+  .modal h2{font-family:var(--display);font-weight:700;font-size:1.8rem;line-height:1.1;margin:8px 0 8px}
+  .modal p{margin:0 0 14px;color:var(--suave)}
+  .modal ul{padding-left:1.2em;margin:0 0 16px}
+  .modal li{margin-bottom:6px}
+  .opcoes{display:grid;gap:10px}
+  .opcao{text-align:left;border:3px solid #dfe5e1;background:#fff;border-radius:14px;padding:12px 16px;font-weight:700;color:var(--tinta)}
+  .opcao:hover:not(:disabled){border-color:var(--tinta)}
+  .opcao small{display:block;font-weight:400;color:var(--suave)}
+  .opcao:disabled{cursor:default;opacity:.5}
+  .opcao.certa{border-color:var(--verde);background:#e2f4ea;opacity:1}
+  .opcao.errada{border-color:var(--porta);background:#fbe5e0;opacity:1}
+  .retorno{margin-top:14px;padding:12px 14px;border-radius:12px;display:none}
+  .retorno.mostra{display:block}
+  .retorno.bom{background:#e2f4ea}
+  .retorno.ruim{background:#fbe5e0}
+  .modal .acoes{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+
+  .chuva{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:20}
+  .chuva i{position:absolute;top:-30px;font-style:normal;font-size:1.6rem;animation:cai 2.4s ease-in forwards}
+  @keyframes cai{to{transform:translateY(110vh) rotate(400deg)}}
+
+  @media (max-width:620px){
+    .hud{grid-template-columns:1fr 1fr}
+    .hud .caixa:first-child{grid-column:1 / -1}
+    .baixo{justify-content:center}
+    .legenda{justify-content:center}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none!important;animation:none!important}
+    .chuva{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Labirinto do Orçamento</h1>
+      <p>Chegue ao cofre com pelo menos <strong>R$ 200</strong>. Pegue moedas, resista às tentações e responda às portas para abrir caminho.</p>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn claro" id="bRegras">Como jogar</button>
+      <button class="btn" id="bNovo">Novo labirinto</button>
+    </div>
+  </header>
+
+  <div class="hud">
+    <div class="caixa">
+      <div class="n" id="hSaldo">R$ 100</div>
+      <div class="l" id="hMetaTxt">Faltam R$ 100 para a meta de R$ 200</div>
+      <div class="progresso" id="hBarra"><div></div></div>
+    </div>
+    <div class="caixa"><div class="n" id="hPortas">0/5</div><div class="l">Portas abertas</div></div>
+    <div class="caixa"><div class="n" id="hPassos">0</div><div class="l">Passos</div></div>
+  </div>
+
+  <div class="labirinto" id="lab" aria-label="Labirinto. Use as setas do teclado ou os botões para andar." tabindex="0"></div>
+
+  <div class="baixo">
+    <div class="legenda">
+      <span><b>🪙</b> Dinheiro (+R$ 25)</span>
+      <span><b>🛍️</b> Tentação</span>
+      <span><b style="color:var(--porta)">■</b> Porta com pergunta</span>
+      <span><b>🏦</b> Cofre da meta</span>
+    </div>
+    <div class="dpad" aria-label="Controles">
+      <button class="cima" data-d="0,-1" aria-label="Cima">↑</button>
+      <button class="esq" data-d="-1,0" aria-label="Esquerda">←</button>
+      <button class="dir" data-d="1,0" aria-label="Direita">→</button>
+      <button class="baixo-b" data-d="0,1" aria-label="Baixo">↓</button>
+    </div>
+  </div>
+</div>
+
+<div class="fundo-modal" id="fm"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitulo" id="modal"></div></div>
+
+<script>
+/* ---------- Configuração ---------- */
+const W = 19, H = 13, INICIO = 100, META = 200, MOEDA = 25, MULTA = 10, N_PORTAS = 5, N_MOEDAS = 8;
+const real = v => "R$ " + Math.round(v).toLocaleString("pt-BR");
+const embaralha = a => { for (let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+
+const perguntas = [
+  {q:"O que é um orçamento?", o:["Um plano de quanto dinheiro entra e para onde ele vai","Uma lista de coisas que eu quero comprar","O extrato do banco no fim do mês"], e:"Orçamento é planejar antes de gastar: quanto entra (receitas) e para onde vai (despesas)."},
+  {q:"No orçamento, o que deve ser garantido primeiro?", o:["Os gastos essenciais, como transporte e alimentação","O lazer do fim de semana","As compras em promoção"], e:"Primeiro o que é obrigatório. Depois metas, reserva e diversão."},
+  {q:"Receita, no orçamento, é:", o:["Todo dinheiro que entra","Todo dinheiro que sai","Só o dinheiro guardado no banco"], e:"Receita é o que entra: mesada, salário, bico, venda de algo."},
+  {q:"Qual destes é um exemplo de despesa fixa?", o:["A passagem de ônibus que você paga todo mês","Um presente de aniversário","Um sorvete no domingo"], e:"Despesa fixa se repete todo mês com valor parecido."},
+  {q:"Qual destes é um exemplo de despesa variável?", o:["Lanche fora de casa","Mensalidade do curso","Conta de internet"], e:"Despesa variável muda de um mês para outro. É onde fica mais fácil economizar."},
+  {q:"Para que serve a reserva de emergência?", o:["Para imprevistos, como um remédio ou um conserto","Para ir a um show","Para aproveitar promoções"], e:"Reserva protege seu orçamento quando algo inesperado acontece."},
+  {q:"Qual destas metas está bem planejada?", o:["Juntar R$ 600 para uma bicicleta em 6 meses","Quero ter dinheiro","Um dia vou comprar algo legal"], e:"Uma boa meta diz o quê, quanto custa e em quanto tempo."},
+  {q:"Para juntar R$ 600 em 6 meses, quanto guardar por mês?", o:["R$ 100","R$ 60","R$ 150"], e:"600 ÷ 6 = 100. Dividir a meta em partes deixa tudo mais possível."},
+  {q:"Você recebeu R$ 400 e gastou R$ 450. Isso é:", o:["Déficit: gastou mais do que recebeu","Superávit: sobrou dinheiro","Equilíbrio"], e:"Déficit é quando as despesas passam das receitas. É o caminho para as dívidas."},
+  {q:"O que quer dizer “pague-se primeiro”?", o:["Guardar uma parte do dinheiro assim que recebe","Gastar tudo com você mesmo","Pagar as contas dos outros antes"], e:"Quem guarda no começo do mês guarda de verdade. Quem espera sobrar quase nunca guarda."},
+  {q:"O que acontece quando você compra algo parcelado?", o:["Compromete o orçamento dos próximos meses","Fica sempre mais barato","Não entra no orçamento"], e:"Cada parcela é uma despesa fixa que você leva para os meses seguintes."},
+  {q:"Na regra 50-30-20, os 20% vão para:", o:["Guardar e investir","Lazer","Contas de casa"], e:"50% necessidades, 30% desejos e 20% para guardar."},
+  {q:"Por que é útil anotar todos os gastos?", o:["Para descobrir para onde o dinheiro está indo","Para poder gastar mais","Não é útil"], e:"Sem anotar, pequenos gastos passam despercebidos e somam muito."},
+  {q:"Sua renda diminuiu. O que fazer?", o:["Rever o orçamento e cortar o que não é essencial","Usar o cartão para manter tudo igual","Ignorar e esperar melhorar"], e:"Orçamento é vivo: quando a realidade muda, o plano muda junto."},
+  {q:"Superávit no orçamento significa:", o:["Que sobrou dinheiro no mês","Que faltou dinheiro","Que você tem uma dívida"], e:"Superávit é quando entra mais do que sai. A sobra pode ir para metas e reserva."},
+  {q:"Uma pessoa gasta R$ 5 por dia com doces. Em 30 dias, isso dá:", o:["R$ 150","R$ 35","R$ 50"], e:"5 × 30 = 150. Pequenos gastos diários viram grandes gastos no mês."}
+];
+const tentacoes = [
+  {n:"Combo na lanchonete", p:35, a:"Estava gostoso, mas não estava no plano. R$ 35 a menos para a meta.", r:"Você lembrou da meta e seguiu em frente. Boa!"},
+  {n:"Skin nova no jogo", p:40, a:"A skin é bonita, mas some quando o jogo sai de moda. O dinheiro também sumiu.", r:"Resistiu! Esse dinheiro continua trabalhando pela sua meta."},
+  {n:"Promoção “só hoje!”", p:50, a:"Desconto só é economia quando você já ia comprar. Aqui foi gasto.", r:"A pressa do “só hoje” quer que você não pense. Você pensou."},
+  {n:"Tênis da moda, entrada de R$ 45", p:45, a:"E ainda ficaram parcelas para os próximos meses...", r:"Sem parcela, sem dor de cabeça no mês que vem."},
+  {n:"Aposta on-line de R$ 30", p:30, a:"Apostas são proibidas para menores de 18 anos, e a casa sempre ganha no final. Dinheiro perdido.", r:"Apostar não é investir. Você fez a escolha certa."}
+];
+const origens = ["Mesada","Bico de fim de semana","Venda de brigadeiro","Troco guardado","Ajudou um vizinho","Cofrinho esquecido","Vendeu um jogo usado"];
+
+/* ---------- Estado ---------- */
+let grade, itens, jog, saldo, portas, passos, bloqueado, fila;
+const lab = document.getElementById("lab");
+
+function gerar(){
+  grade = Array.from({length:H}, () => Array(W).fill(1));
+  const pilha = [[1,1]]; grade[1][1] = 0;
+  while (pilha.length){
+    const [x,y] = pilha[pilha.length-1];
+    const viz = embaralha([[2,0],[-2,0],[0,2],[0,-2]]).filter(([dx,dy]) => {
+      const nx=x+dx, ny=y+dy; return nx>0 && ny>0 && nx<W-1 && ny<H-1 && grade[ny][nx]===1;
+    });
+    if (!viz.length){ pilha.pop(); continue; }
+    const [dx,dy] = viz[0];
+    grade[y+dy/2][x+dx/2] = 0; grade[y+dy][x+dx] = 0;
+    pilha.push([x+dx,y+dy]);
+  }
+  // caminho único até a saída
+  const saida = [W-2,H-2], pai = {}, vis = new Set(["1,1"]), q = [[1,1]];
+  while (q.length){
+    const [x,y] = q.shift();
+    if (x===saida[0] && y===saida[1]) break;
+    for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const nx=x+dx, ny=y+dy, k=nx+","+ny;
+      if (grade[ny][nx]===0 && !vis.has(k)){ vis.add(k); pai[k]=x+","+y; q.push([nx,ny]); }
+    }
+  }
+  const caminho = []; let k = saida.join(",");
+  while (k){ caminho.unshift(k); k = pai[k]; }
+  const noCaminho = new Set(caminho);
+
+  itens = {};
+  itens[saida.join(",")] = {t:"saida"};
+  const L = caminho.length;
+  for (let i=1;i<=N_PORTAS;i++) itens[caminho[Math.round(L*i/(N_PORTAS+1))]] = {t:"porta", n:i};
+  const tents = embaralha(tentacoes.slice());
+  [0.5,1.5,2.5,3.5,4.5].forEach((f,i) => {
+    const c = caminho[Math.round(L*f/(N_PORTAS+1))];
+    if (!itens[c] && c !== "1,1") itens[c] = {t:"tentacao", d:tents[i]};
+  });
+  // moedas nos becos sem saída, fora do caminho principal
+  const becos = [];
+  for (let y=1;y<H-1;y++) for (let x=1;x<W-1;x++){
+    if (grade[y][x]!==0) continue;
+    const k2 = x+","+y;
+    const abertos = [[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dy]) => grade[y+dy][x+dx]===0).length;
+    if (abertos===1 && !noCaminho.has(k2) && !itens[k2]) becos.push(k2);
+  }
+  const outros = [];
+  for (let y=1;y<H-1;y++) for (let x=1;x<W-1;x++){
+    const k2 = x+","+y;
+    if (grade[y][x]===0 && !noCaminho.has(k2) && !itens[k2] && !becos.includes(k2)) outros.push(k2);
+  }
+  embaralha(becos).concat(embaralha(outros)).slice(0, N_MOEDAS).forEach(k2 => itens[k2] = {t:"moeda"});
+}
+
+function desenhar(){
+  lab.style.setProperty("--w", W);
+  lab.style.gridTemplateColumns = `repeat(${W},1fr)`;
+  let h = "";
+  for (let y=0;y<H;y++) for (let x=0;x<W;x++){
+    const it = itens[x+","+y];
+    if (grade[y][x]===1){ h += `<div class="c parede"></div>`; continue; }
+    if (!it){ h += `<div class="c" id="c${x}_${y}"></div>`; continue; }
+    const cls = {porta:"porta", tentacao:"tentacao", saida:"saida", moeda:""}[it.t];
+    const cont = {porta:"?", tentacao:"🛍️", saida:"🏦", moeda:"🪙"}[it.t];
+    h += `<div class="c ${cls}" id="c${x}_${y}">${cont}</div>`;
+  }
+  h += `<div class="jogador" id="jog" style="width:${100/W}%;height:${100/H}%">🧑‍🎓</div>`;
+  lab.innerHTML = h;
+  posiciona();
+}
+function posiciona(){ document.getElementById("jog").style.transform = `translate(${jog[0]*100}%, ${jog[1]*100}%)`; }
+
+function hud(){
+  document.getElementById("hSaldo").textContent = real(saldo);
+  const falta = Math.max(0, META - saldo);
+  document.getElementById("hMetaTxt").textContent = falta ? `Faltam ${real(falta)} para a meta de ${real(META)}` : `Meta de ${real(META)} alcançada! Vá até o cofre.`;
+  const b = document.getElementById("hBarra");
+  b.firstElementChild.style.width = Math.min(100, saldo/META*100) + "%";
+  b.classList.toggle("ok", saldo >= META);
+  document.getElementById("hPortas").textContent = `${portas}/${N_PORTAS}`;
+  document.getElementById("hPassos").textContent = passos;
+}
+function brilho(txt, menos){
+  const j = document.getElementById("jog"), s = document.createElement("div");
+  s.className = "brilho" + (menos ? " menos" : "");
+  s.textContent = txt;
+  s.style.left = (jog[0]/W*100) + "%"; s.style.top = (jog[1]/H*100) + "%";
+  lab.appendChild(s); setTimeout(() => s.remove(), 950);
+}
+
+function novoJogo(){
+  gerar(); jog = [1,1]; saldo = INICIO; portas = 0; passos = 0; bloqueado = false;
+  fila = embaralha(perguntas.slice());
+  desenhar(); hud();
+}
+
+/* ---------- Movimento ---------- */
+function mover(dx, dy){
+  if (bloqueado) return;
+  const nx = jog[0]+dx, ny = jog[1]+dy;
+  if (grade[ny][nx]===1){
+    const j = document.getElementById("jog"); j.classList.remove("bateu"); void j.offsetWidth; j.classList.add("bateu");
+    return;
+  }
+  const k = nx+","+ny, it = itens[k];
+  if (it && it.t==="porta") return abrirPorta(nx, ny, it);
+  anda(nx, ny);
+  if (!it) return;
+  if (it.t==="moeda"){
+    saldo += MOEDA; delete itens[k]; limpa(nx,ny);
+    brilho(`+${real(MOEDA)} ${origens[Math.floor(Math.random()*origens.length)]}`);
+    hud();
+  } else if (it.t==="tentacao"){
+    tentacao(nx, ny, it);
+  } else if (it.t==="saida"){
+    chegou();
+  }
+}
+function anda(x, y){ jog = [x,y]; passos++; posiciona(); hud(); }
+function limpa(x, y){ const c = document.getElementById(`c${x}_${y}`); c.className = "c"; c.textContent = ""; }
+
+document.addEventListener("keydown", e => {
+  const m = {ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],w:[0,-1],s:[0,1],a:[-1,0],d:[1,0],W:[0,-1],S:[0,1],A:[-1,0],D:[1,0]}[e.key];
+  if (m && !bloqueado){ e.preventDefault(); mover(...m); }
+});
+document.querySelectorAll(".dpad button").forEach(b => {
+  const [dx,dy] = b.dataset.d.split(",").map(Number);
+  let t;
+  const para = () => clearInterval(t);
+  b.addEventListener("pointerdown", e => { e.preventDefault(); mover(dx,dy); t = setInterval(() => mover(dx,dy), 180); });
+  ["pointerup","pointerleave","pointercancel"].forEach(ev => b.addEventListener(ev, para));
+  b.addEventListener("keydown", e => { if (e.key==="Enter"||e.key===" "){ e.preventDefault(); mover(dx,dy); } });
+});
+// deslizar o dedo sobre o labirinto
+let toque = null;
+lab.addEventListener("pointerdown", e => toque = [e.clientX, e.clientY]);
+lab.addEventListener("pointerup", e => {
+  if (!toque) return;
+  const dx = e.clientX - toque[0], dy = e.clientY - toque[1]; toque = null;
+  if (Math.max(Math.abs(dx),Math.abs(dy)) < 24) return;
+  Math.abs(dx) > Math.abs(dy) ? mover(Math.sign(dx),0) : mover(0,Math.sign(dy));
+});
+
+/* ---------- Janelas ---------- */
+const fm = document.getElementById("fm"), modal = document.getElementById("modal");
+function abre(html){
+  bloqueado = true; modal.innerHTML = html; fm.classList.add("aberto");
+  const f = modal.querySelector("button:not(:disabled)"); if (f) f.focus();
+}
+function fecha(){ fm.classList.remove("aberto"); bloqueado = false; lab.focus(); }
+
+function abrirPorta(x, y, it){
+  if (!fila.length) fila = embaralha(perguntas.slice());
+  const p = fila.pop();
+  const ordem = embaralha([0,1,2]);
+  abre(`<div class="selo">🚪</div><h2 id="mTitulo">Porta ${it.n}: ${p.q}</h2>
+    <p>Acerte para passar. Cada erro custa uma taxa de ${real(MULTA)}.</p>
+    <div class="opcoes">${ordem.map(i => `<button class="opcao" data-i="${i}">${p.o[i]}</button>`).join("")}</div>
+    <div class="retorno" id="ret" role="status"></div>
+    <div class="acoes"><button class="btn" id="mOk" hidden>Continuar</button></div>`);
+  modal.querySelectorAll(".opcao").forEach(b => b.onclick = () => {
+    const certo = b.dataset.i === "0";
+    modal.querySelectorAll(".opcao").forEach(o => { o.disabled = true; if (o.dataset.i==="0") o.classList.add("certa"); });
+    const r = document.getElementById("ret"), ok = document.getElementById("mOk");
+    if (certo){
+      r.className = "retorno mostra bom"; r.innerHTML = `<strong>Porta aberta!</strong> ${p.e}`;
+      ok.textContent = "Passar pela porta";
+      ok.onclick = () => { delete itens[x+","+y]; limpa(x,y); portas++; fecha(); anda(x,y); };
+    } else {
+      b.classList.add("errada");
+      saldo = Math.max(0, saldo - MULTA); hud();
+      r.className = "retorno mostra ruim"; r.innerHTML = `<strong>Porta trancada. −${real(MULTA)}</strong> ${p.e} Tente de novo com outra pergunta.`;
+      ok.textContent = "Voltar ao labirinto";
+      ok.onclick = () => { fecha(); brilho(`−${real(MULTA)}`, true); };
+    }
+    ok.hidden = false; ok.focus();
+  });
+}
+
+function tentacao(x, y, it){
+  const d = it.d, podeComprar = saldo >= d.p;
+  abre(`<div class="selo">🛍️</div><h2 id="mTitulo">Tentação: ${d.n}</h2>
+    <p>Custa ${real(d.p)}. Não está no seu plano. O que você faz?</p>
+    <div class="opcoes">
+      <button class="opcao" data-a="1" ${podeComprar?"":"disabled"}>Comprar<small>${podeComprar ? "−"+real(d.p) : "Você não tem esse dinheiro"}</small></button>
+      <button class="opcao" data-a="0">Resistir e seguir o plano<small>O dinheiro continua com você</small></button>
+    </div>
+    <div class="retorno" id="ret" role="status"></div>
+    <div class="acoes"><button class="btn" id="mOk" hidden>Continuar</button></div>`);
+  modal.querySelectorAll(".opcao").forEach(b => b.onclick = () => {
+    const comprou = b.dataset.a === "1";
+    modal.querySelectorAll(".opcao").forEach(o => o.disabled = true);
+    b.classList.add(comprou ? "errada" : "certa");
+    const r = document.getElementById("ret");
+    if (comprou){ saldo -= d.p; hud(); r.className = "retorno mostra ruim"; r.textContent = d.a; }
+    else { r.className = "retorno mostra bom"; r.textContent = d.r; }
+    delete itens[x+","+y]; limpa(x,y);
+    const ok = document.getElementById("mOk"); ok.hidden = false; ok.focus();
+    ok.onclick = () => { fecha(); if (comprou) brilho(`−${real(d.p)}`, true); };
+  });
+}
+
+function chegou(){
+  if (saldo >= META){
+    abre(`<div class="selo">🏆</div><h2 id="mTitulo">Você venceu o labirinto!</h2>
+      <p>Chegou ao cofre com <strong>${real(saldo)}</strong>, ${saldo>META?`${real(saldo-META)} acima da meta`:"exatamente a meta"}, em ${passos} passos. Planejar, resistir às tentações e saber as regras do orçamento te trouxe até aqui.</p>
+      <div class="acoes"><button class="btn" id="mNovo">Jogar outro labirinto</button><button class="btn claro" id="mFecha">Ver o labirinto</button></div>`);
+    document.getElementById("mNovo").onclick = () => { fecha(); novoJogo(); };
+    document.getElementById("mFecha").onclick = () => { fecha(); bloqueado = true; };
+    chuva();
+  } else {
+    abre(`<div class="selo">🔒</div><h2 id="mTitulo">O cofre ainda não abre</h2>
+      <p>Você tem ${real(saldo)}, mas a meta é ${real(META)}. Faltam <strong>${real(META-saldo)}</strong>. Volte pelos corredores e procure moedas nos cantos que você ainda não explorou.</p>
+      <div class="acoes"><button class="btn" id="mFecha">Voltar a explorar</button></div>`);
+    document.getElementById("mFecha").onclick = fecha;
+  }
+}
+
+function chuva(){
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const c = document.createElement("div"); c.className = "chuva";
+  for (let i=0;i<40;i++){
+    const m = document.createElement("i"); m.textContent = "🪙";
+    m.style.left = Math.random()*100 + "vw"; m.style.animationDelay = Math.random()*0.9 + "s";
+    c.appendChild(m);
+  }
+  document.body.appendChild(c); setTimeout(() => c.remove(), 3600);
+}
+
+function regras(){
+  abre(`<div class="selo">🧭</div><h2 id="mTitulo">Como jogar</h2>
+    <ul>
+      <li>Você começa com <strong>${real(INICIO)}</strong> e precisa chegar ao cofre 🏦 com pelo menos <strong>${real(META)}</strong>.</li>
+      <li>Ande com as setas do teclado, com os botões ou deslizando o dedo no labirinto.</li>
+      <li>🪙 Moedas valem ${real(MOEDA)}. Elas ficam escondidas nos cantos, fora do caminho principal: explore!</li>
+      <li>As portas vermelhas só abrem com a resposta certa sobre orçamento. Cada erro custa ${real(MULTA)}.</li>
+      <li>🛍️ Tentações aparecem no caminho. Comprar ou resistir? A decisão é sua.</li>
+    </ul>
+    <p>Dica para a turma: joguem em duplas. Um anda, o outro ajuda a responder.</p>
+    <div class="acoes"><button class="btn" id="mFecha">Começar</button></div>`);
+  document.getElementById("mFecha").onclick = fecha;
+}
+
+document.getElementById("bNovo").onclick = novoJogo;
+document.getElementById("bRegras").onclick = regras;
+novoJogo();
+regras();
+</script>
+</body>
+</html>
